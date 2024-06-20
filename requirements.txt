@@ -1,0 +1,2 @@
+prometheus-client>=0.20.0,<1.0.0
+graphyte>=1.7.1,<2.0.0
