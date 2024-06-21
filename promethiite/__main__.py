@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Promethiite ingests Prometheus metrics, converts them to Graphite metrics, and
-sends them to a configured Graphite server over TCP
+sends them to a configured Graphite server
 """
 
 import argparse
@@ -21,7 +21,7 @@ def parse_args(argv=None) -> argparse.Namespace:
     """
     descr: str = """
         Ingests Prometheus metrics, converts them to Graphite metrics, and
-        sends them to a configured Graphite server over TCP
+        sends them to a configured Graphite server
         """
     parser = argparse.ArgumentParser(
         description=descr,
