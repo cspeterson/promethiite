@@ -131,7 +131,7 @@ def tcp_listener():
             },
         ),
         (
-            # Use UDP. No mock needed because no response expected
+            # Use UDP
             [
                 "--server",
                 HOST,
