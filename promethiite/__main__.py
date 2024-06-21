@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Promethiite ingests Prometheus metrics, converts them to Graphite metrics, and
-sends them to a configured Graphite server
+sends them to a configured Graphite server over TCP
 """
 
 import argparse
@@ -21,7 +21,7 @@ def parse_args(argv=None) -> argparse.Namespace:
     """
     descr: str = """
         Ingests Prometheus metrics, converts them to Graphite metrics, and
-        sends them to a configured Graphite server
+        sends them to a configured Graphite server over TCP
         """
     parser = argparse.ArgumentParser(
         description=descr,
@@ -107,15 +107,19 @@ def main():
 
     raw_metrics: str
     if args.file_path:
+        logging.info('Taking input stats from file `%s`', args.file_path)
         with open(args.file_path, mode="r", encoding="utf-8") as gfile:
             raw_metrics = gfile.read()
     else:
+        logging.info('Taking input stats from STDIN')
         raw_metrics = sys.stdin.read()
+    logging.debug('Ingested metrics: `%s`', raw_metrics)
     for family in text_string_to_metric_families(raw_metrics):
         for sample in family.samples:
             name = sample.name
             labels = {k: v.replace(" ", "_") for k, v in sample.labels.items()}
             value = sample.value
+            logging.debug('Sending Prometheus stat `%s` to Graphite', sample)
             graphyte.send(name, value, tags=labels)
 
 
