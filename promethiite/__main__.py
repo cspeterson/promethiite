@@ -114,6 +114,7 @@ def main():
         logging.info('Taking input stats from STDIN')
         raw_metrics = sys.stdin.read()
     logging.debug('Ingested metrics: `%s`', raw_metrics)
+    metric_count: int = 0
     for family in text_string_to_metric_families(raw_metrics):
         for sample in family.samples:
             name = sample.name
@@ -121,6 +122,8 @@ def main():
             value = sample.value
             logging.debug('Sending Prometheus stat `%s` to Graphite', sample)
             graphyte.send(name, value, tags=labels)
+            metric_count += 1
+    logging.info("%s metrics sent to Graphite server", metric_count)
 
 
 if __name__ == "__main__":
