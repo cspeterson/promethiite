@@ -103,7 +103,12 @@ def main():
     args = parse_args(sys.argv[1:])
     logging.debug("Argparse results: %s", args)
 
-    graphyte.init(args.server, port=args.port, prefix=args.prefix.replace(".", "_"), raise_send_errors=True)
+    graphyte.init(
+        args.server,
+        port=args.port,
+        prefix=args.prefix.replace(".", "_"),
+        raise_send_errors=True,
+    )
 
     raw_metrics: str
     if args.file_path:
@@ -123,10 +128,7 @@ def main():
             labels = {k: v.replace(" ", "_") for k, v in sample.labels.items()}
             value = sample.value
             logging.debug("Sending Prometheus stat `%s` to Graphite", sample)
-            try:
-                graphyte.send(name, value, tags=labels)
-            except BaseException as err:
-                print(f"#########$$$$$$$ {err}")
+            graphyte.send(name, value, tags=labels)
             sent_metric_count += 1
     logging.info("%s metrics scraped from Prometheus input", scraped_metric_count)
     logging.info("%s metrics sent to Graphite server", sent_metric_count)
