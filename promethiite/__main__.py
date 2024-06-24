@@ -103,27 +103,39 @@ def main():
     args = parse_args(sys.argv[1:])
     logging.debug("Argparse results: %s", args)
 
-    graphyte.init(args.server, port=args.port, prefix=args.prefix.replace(".", "_"))
+    graphyte.init(args.server, port=args.port, prefix=args.prefix.replace(".", "_"), raise_send_errors=True)
 
     raw_metrics: str
     if args.file_path:
-        logging.info('Taking input stats from file `%s`', args.file_path)
+        logging.info("Taking input stats from file `%s`", args.file_path)
         with open(args.file_path, mode="r", encoding="utf-8") as gfile:
             raw_metrics = gfile.read()
     else:
-        logging.info('Taking input stats from STDIN')
+        logging.info("Taking input stats from STDIN")
         raw_metrics = sys.stdin.read()
-    logging.debug('Ingested metrics: `%s`', raw_metrics)
-    metric_count: int = 0
+    logging.debug("Ingested metrics: `%s`", raw_metrics)
+    scraped_metric_count: int = 0
+    sent_metric_count: int = 0
     for family in text_string_to_metric_families(raw_metrics):
         for sample in family.samples:
+            scraped_metric_count += 1
             name = sample.name
             labels = {k: v.replace(" ", "_") for k, v in sample.labels.items()}
             value = sample.value
-            logging.debug('Sending Prometheus stat `%s` to Graphite', sample)
-            graphyte.send(name, value, tags=labels)
-            metric_count += 1
-    logging.info("%s metrics sent to Graphite server", metric_count)
+            logging.debug("Sending Prometheus stat `%s` to Graphite", sample)
+            try:
+                graphyte.send(name, value, tags=labels)
+            except BaseException as err:
+                print(f"#########$$$$$$$ {err}")
+            sent_metric_count += 1
+    logging.info("%s metrics scraped from Prometheus input", scraped_metric_count)
+    logging.info("%s metrics sent to Graphite server", sent_metric_count)
+    if scraped_metric_count != sent_metric_count:
+        print(
+            "Something went wrong - unable to convert and send all metrics",
+            file=sys.stderr,
+        )
+        sys.exit(1)
 
 
 if __name__ == "__main__":

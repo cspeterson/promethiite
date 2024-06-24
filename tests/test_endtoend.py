@@ -26,7 +26,8 @@ def unused_port() -> int:
     return sock.getsockname()[1]
 
 
-PORT: int = unused_port()
+# PORT: int = unused_port()
+PORT: int = 8678
 
 
 def compare_stats(*, prometheus_data_path, graphite_data_path) -> bool:
@@ -62,6 +63,8 @@ def compare_stats(*, prometheus_data_path, graphite_data_path) -> bool:
                 )
     with open(graphite_data_path, mode="r", encoding="utf-8") as gfile:
         glines = [line.rstrip() for line in gfile]
+    assert 0 not in [len(pdata), len(glines)]
+    assert len(pdata) == len(glines)
     for pstat, gline in zip(pdata, glines):
         # Zero out the timestampf rot his test
         gline = re.sub(r" \d+$", " 0", gline)
@@ -80,11 +83,13 @@ def compare_stats(*, prometheus_data_path, graphite_data_path) -> bool:
 @pytest.fixture(scope="session")
 def mock_graphite_server():
     """Blindly accepts some tcp traffic"""
-    proc = multiprocessing.Process(target=tcp_listener)
-    proc = multiprocessing.Process(target=udp_listener)
-    proc.start()
+    tcp_proc = multiprocessing.Process(target=tcp_listener)
+    udp_proc = multiprocessing.Process(target=udp_listener)
+    tcp_proc.start()
+    udp_proc.start()
     yield True
-    proc.terminate()
+    tcp_proc.terminate()
+    udp_proc.terminate()
 
 
 def udp_listener():
@@ -125,6 +130,7 @@ def tcp_listener():
                 PORT,
                 "--prefix",
                 PREFIX,
+                "-vv",
             ],
             {
                 "returncode": 0,
@@ -141,6 +147,7 @@ def tcp_listener():
                 PREFIX,
                 "--proto",
                 "udp",
+                "-vv",
             ],
             {
                 "returncode": 0,
@@ -157,6 +164,7 @@ def tcp_listener():
                 PREFIX,
                 "--file",
                 TEST_DATA_FILE_PATH,
+                "-vv",
             ],
             {
                 "returncode": 0,
@@ -177,10 +185,14 @@ def test_end_to_end(mock_graphite_server, test_input, expected):
             )
     else:
         res = subprocess.run(command, capture_output=True, check=False, text=True)
+    # print(res.stdout)
+    # print(res.stderr)
     assert res.returncode == expected["returncode"]
     compare_stats(
         prometheus_data_path=TEST_DATA_FILE_PATH, graphite_data_path=RECVD_FILE.name
     )
+    RECVD_FILE.truncate(0)
+    RECVD_FILE.seek(0)
 
 
 # pylint: enable=unused-argument
