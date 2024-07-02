@@ -26,8 +26,7 @@ def unused_port() -> int:
     return sock.getsockname()[1]
 
 
-# PORT: int = unused_port()
-PORT: int = 8678
+PORT: int = unused_port()
 
 
 def compare_stats(*, prometheus_data_path, graphite_data_path) -> bool:
