@@ -1,17 +1,17 @@
 """ End-to-end tests """
 
+import filecmp
 import multiprocessing
 import os
-import re
 import socket
 import subprocess
 import tempfile
 from typing import List
 
 import pytest  # type:ignore
-from prometheus_client.parser import text_string_to_metric_families
 
 TEST_DATA_FILE_PATH: str = "tests/prometheus_stats.txt"
+REFERENCE_GRAPHITE_DATA_PATH: str = "tests/graphite_stats.txt"
 HOST: str = "localhost"
 PREFIX: str = "myprefix"
 # pylint: disable=consider-using-with
@@ -29,54 +29,12 @@ def unused_port() -> int:
 PORT: int = unused_port()
 
 
-def compare_stats(*, prometheus_data_path, graphite_data_path) -> bool:
+def validate_stats(*, graphite_data_path) -> bool:
     """
-    Test whether a pair of Prometheus and Graphite stats files are effectively
-    equivalent
-
-    accounting for the added prefix and the (irrelevant) timestamp
-
-    Graphite plaintext stats can come in two formats:
-        # https://graphite.readthedocs.io/en/latest/feeding-carbon.html
-        # https://graphite.readthedocs.io/en/latest/tags.html
-        <metric path> <metric value> <metric timestamp>
-        <metric path>;tag1=value1,tag2=value2 <metric value> <metric timestamp>
-
-    Prometheus:
-        # https://github.com/prometheus/docs/blob/main/content/docs/instrumenting/exposition_formats.md
-        <metric name>{tag1="value1",tag2="value2"} <metric value> <optional timestamp>
-
+    Compare the generated Graphite states against the manually-created
+    known-good reference
     """
-    with open(prometheus_data_path, mode="r", encoding="utf-8") as pfile:
-        # Translate the prometheus stats into a dict
-        pdata: List[dict] = []
-        for family in text_string_to_metric_families(pfile.read()):
-            for sample in family.samples:
-                pdata.append(
-                    {
-                        "name": sample.name,
-                        "labels": sample.labels,
-                        "value": sample.value,
-                        "timestamp": 0,
-                    }
-                )
-    with open(graphite_data_path, mode="r", encoding="utf-8") as gfile:
-        glines = [line.rstrip() for line in gfile]
-    assert 0 not in [len(pdata), len(glines)]
-    assert len(pdata) == len(glines)
-    for pstat, gline in zip(pdata, glines):
-        # Zero out the timestampf rot his test
-        gline = re.sub(r" \d+$", " 0", gline)
-        strlabels: List = sorted([f"{k}={v}" for k, v in pstat["labels"].items()])
-        tags = ";".join(strlabels)
-        stat_tag_joiner: str = ""
-        if tags:
-            stat_tag_joiner = ";"
-        assert (
-            f"{PREFIX}.{pstat['name']}{stat_tag_joiner}{tags} {pstat['value']} "
-            f"{pstat['timestamp']}"
-        ) == gline
-    return True
+    return filecmp.cmp(graphite_data_path, REFERENCE_GRAPHITE_DATA_PATH)
 
 
 @pytest.fixture(scope="session")
@@ -175,7 +133,9 @@ def tcp_listener():
 # pylint: disable=redefined-outer-name
 def test_end_to_end(mock_graphite_server, test_input, expected):
     """Test"""
-    command: List[str] = ["python3", "-m", "promethiite"] + [str(x) for x in test_input]
+    command: List[str] = ["python3", "-m", "promethiite", "-vv"] + [
+        str(x) for x in test_input
+    ]
 
     if "--file" not in test_input:
         with open(TEST_DATA_FILE_PATH, mode="r", encoding="utf-8") as stats_f:
@@ -184,12 +144,8 @@ def test_end_to_end(mock_graphite_server, test_input, expected):
             )
     else:
         res = subprocess.run(command, capture_output=True, check=False, text=True)
-    # print(res.stdout)
-    # print(res.stderr)
     assert res.returncode == expected["returncode"]
-    compare_stats(
-        prometheus_data_path=TEST_DATA_FILE_PATH, graphite_data_path=RECVD_FILE.name
-    )
+    validate_stats(graphite_data_path=RECVD_FILE.name)
     RECVD_FILE.truncate(0)
     RECVD_FILE.seek(0)
 

@@ -1,5 +1,5 @@
 """ promethiite """
 __author__ = "cspeterson"
-__version__ = "0.1.3"
+__version__ = "0.2.0"
 __title__ = "promethiite"
 __license__ = "License :: OSI Approved :: MIT License"

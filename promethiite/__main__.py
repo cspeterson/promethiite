@@ -124,11 +124,14 @@ def main():
     for family in text_string_to_metric_families(raw_metrics):
         for sample in family.samples:
             scraped_metric_count += 1
-            name = sample.name
+            base_name = sample.name
             labels = {k: v.replace(" ", "_") for k, v in sample.labels.items()}
+            name: str
             value = sample.value
-            logging.debug("Sending Prometheus stat `%s` to Graphite", sample)
-            graphyte.send(name, value, tags=labels)
+            label: str = ".".join(f"{k}.{v}" for k, v in labels.items())
+            name = ".".join([base_name, label])
+            logging.debug("Sending Prometheus stat `%s %s` to Graphite", name, value)
+            graphyte.send(name, value)
             sent_metric_count += 1
     logging.info("%s metrics scraped from Prometheus input", scraped_metric_count)
     logging.info("%s metrics sent to Graphite server", sent_metric_count)
